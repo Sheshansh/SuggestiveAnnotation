@@ -20,18 +20,17 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-
+import random
 import pandas as pd
-
-# tf.image.decode_png(tf.read_file('train_79_anno.png')).eval(session=sess)
+import numpy as np
 
 # Process images of this size.
-IMAGE_WIDTH = 775
-IMAGE_HEIGHT = 522
+IMAGE_WIDTH = 600
+IMAGE_HEIGHT = 400
 
 # Global constants describing the Dataset data set.
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 79
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 72
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = 320
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = 20
 
 
 def read_from_queue(path,num_channels):
@@ -76,7 +75,7 @@ def read_dataset(all_files_queue):
     return result
 
 
-def _generate_image_and_label_batch(image, label, i_path, s_path, csv_content, min_queue_examples,
+def _generate_image_and_label_batch(image, label, i_path, min_queue_examples,
                                     batch_size, shuffle):
     """Construct a queued batch of images and labels.
     Args:
@@ -93,8 +92,8 @@ def _generate_image_and_label_batch(image, label, i_path, s_path, csv_content, m
     # Create a queue that shuffles the examples, and then
     # read 'batch_size' images + labels from the example queue.
     num_preprocess_threads = 16
-    images, labels, i_paths, s_paths = tf.train.batch(
-        [image, label, i_path, s_path],
+    images, labels, i_paths = tf.train.batch(
+        [image, label, i_path],
         batch_size=batch_size,
         num_threads=num_preprocess_threads,
         capacity=min_queue_examples+batch_size)
@@ -102,10 +101,10 @@ def _generate_image_and_label_batch(image, label, i_path, s_path, csv_content, m
     # Display the training images in the visualizer.
     tf.summary.image('images', images)
 
-    return images, labels, i_paths, s_paths, i_path, s_path, csv_content
+    return images, labels, i_paths
 
 
-def gen_csv_paths(data_dir, pref):
+def gen_csv_paths(data_dir, pref, sessid = None):
     """
     Generate CSV file from image and segment file paths.
     Args:
@@ -113,27 +112,42 @@ def gen_csv_paths(data_dir, pref):
         pref: Prefix (either 'train' or 'test')
     """
     filenames = get_png_files(os.path.join(data_dir, 'images_' + pref))
-    segments = get_png_files(os.path.join(data_dir, 'segments_'
-                                                     + pref))
+    # segments = get_png_files(os.path.join(data_dir, 'segments_'+ pref))
+    # Assuming that segments have just anno added to their names
 
     filenames.sort()
-    segments.sort()
-    all_files = [filenames, segments]
-    pd_arr = pd.DataFrame(all_files).transpose()
-    pd_arr.to_csv(pref + '.csv', index=False, header=False)
+    segments = []
+    for filename in filenames:
+        name = filename
+        name = name.replace("/images_","/segments_")
+        segments.append(name[:-4]+"_anno"+name[-4:])
+    all_files = np.array([filenames, segments])
+
+    if pref == 'train':
+        indices = [random.randint(0,len(all_files[0])-1) for i in range(len(all_files[0]))]
+        all_files = all_files[:,indices]
+        pd_arr = pd.DataFrame(all_files).transpose()
+        pd_arr.to_csv(pref + str(sessid) + '.csv', index=False, header=False)
+    else:
+        pd_arr = pd.DataFrame(all_files).transpose()
+        pd_arr.to_csv(pref + '.csv', index=False, header=False)
 
 
-def get_read_input(eval_data):
+def get_read_input(eval_data, sessid = None):
     """
     Fetch input data row by row from CSV files.
     Args:
         eval_data: String representing whether to read from 'train' or 'test' directories.
+        sessid : As for bootstrapping, there are multiple sessions and multiple csv files.
     Returns:
         read_input: An object representing a single example.
         reshaped_image: Image of type tf.float32, reshaped to correct dimensions.
     """
     # Create queues that produce the filenames and labels to read.
-    all_files_queue = tf.train.string_input_producer([eval_data + '.csv'])
+    if eval_data == 'train':
+        all_files_queue = tf.train.string_input_producer([eval_data + str(sessid) + '.csv'])
+    else:
+        all_files_queue = tf.train.string_input_producer([eval_data + '.csv'])
 
     # Read examples from files in the filename queue.
     read_input = read_dataset(all_files_queue)
@@ -147,7 +161,7 @@ def get_png_files(dirname):
     return [dirname + '/' + f for f in os.listdir(dirname) if f.endswith('.png')]
 
 
-def inputs(eval_data, batch_size):
+def inputs(eval_data, batch_size, sessid):
     """Construct input for Dataset evaluation using the Reader ops.
     Args:
         eval_data: String representing whether to read from 'train' or 'test' directories.
@@ -157,7 +171,7 @@ def inputs(eval_data, batch_size):
         labels: Labels. 4D tensor of [batch_size, IMAGE_SIZE, IMAGE_SIZE, 2] size.
     """
     num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
-    read_input, reshaped_image = get_read_input(eval_data)
+    read_input, reshaped_image = get_read_input(eval_data, sessid)
 
     # Image processing for evaluation.
 
@@ -179,9 +193,6 @@ def inputs(eval_data, batch_size):
     # Generate a batch of images and labels by building up a queue of examples.
     shuffle = False
     # shuffle = False if eval_data == 'test' else True
-    return _generate_image_and_label_batch(float_image, read_input.label, read_input.i_path, read_input.s_path, read_input.csv,
+    return _generate_image_and_label_batch(float_image, read_input.label, read_input.i_path,
                                            min_queue_examples, batch_size,
                                            shuffle=shuffle)
-
-gen_csv_paths('warwick_data/','train')
-gen_csv_paths('warwick_data/','test')

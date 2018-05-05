@@ -27,20 +27,20 @@ import mainutils
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('train_dir', '/tmp/bbbc006_train',
+tf.app.flags.DEFINE_string('train_dir', '/tmp/warwick_train',
 						   """Directory where to write event logs """
 						   """and checkpoint.""")
 tf.app.flags.DEFINE_string('eval_data', 'train',
 						   """Either 'test' or 'train'.""")
-tf.app.flags.DEFINE_integer('max_steps', 5000,
+tf.app.flags.DEFINE_integer('max_steps', 4000,
 							"""Number of batches to run.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
 							"""Whether to log device placement.""")
-tf.app.flags.DEFINE_integer('log_frequency', 10,
+tf.app.flags.DEFINE_integer('log_frequency', 200,
 							"""How often to log results to the console.""")
 tf.logging.set_verbosity(tf.logging.DEBUG)
 
-def train():
+def train(sessid):
 	"""Train BBBC006 for a number of steps."""
 	with tf.Graph().as_default():
 		ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
@@ -54,14 +54,11 @@ def train():
 		# Get images and labels for BBBC006.
 		# Force input pipeline to CPU:0 to avoid operations sometimes ending up
 		# on GPU and resulting in a slow down.
-		images, labels, i_paths, s_paths, i_path, s_path, csv_content = mainutils.inputs(eval_data=FLAGS.eval_data)
-
-		temp = tf.is_nan(images)
-
+		images, labels, i_paths = mainutils.inputs(eval_data=FLAGS.eval_data,sessid=sessid)
 		# Build a Graph that computes the logits predictions from the
 		# inference model.
 		# s_fuse = mainutils.inference(images)
-		s_fuse = mainutils.inference_bottleneck(images)
+		s_fuse, encoding = mainutils.inference_bottleneck(images)
 		mainutils.get_show_preds(s_fuse)
 
 		# # Code for finding out the total number of trainable parameters
@@ -140,12 +137,17 @@ def train():
 				saver.restore(mon_sess, ckpt.model_checkpoint_path)
 				logging.info("Model restored from file: %s" % ckpt.model_checkpoint_path)
 			while not mon_sess.should_stop():
-				_,ip,sp,csv,ips,sps,losseval = mon_sess.run([train_op,i_path,s_path,csv_content,i_paths,s_paths,loss])
-				# print(ip,losseval)
-
+				_,losseval = mon_sess.run([train_op,loss])
 
 def main(argv=None):  # pylint: disable=unused-argument
-	train()
+	FLAGS.train_dir = '/tmp/warwick_train_0'
+	train(0)
+	FLAGS.train_dir = '/tmp/warwick_train_1'
+	train(1)
+	FLAGS.train_dir = '/tmp/warwick_train_2'
+	train(2)
+	FLAGS.train_dir = '/tmp/warwick_train_3'
+	train(3)
 
 if __name__ == '__main__':
 	tf.app.run()

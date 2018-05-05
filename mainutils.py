@@ -21,11 +21,17 @@ from __future__ import print_function
 import re
 
 import tensorflow as tf
-from tensorflow.contrib.slim.python.slim.nets.resnet_v2 import bottleneck
+# from tensorflow.contrib.slim.python.slim.nets.resnet_v2 import bottleneck
 import numpy as np
 import math
-
 import data_input
+
+from tensorflow.python.ops import variable_scope
+from tensorflow.contrib.layers.python.layers import utils
+from tensorflow.contrib.layers.python.layers import layers
+from tensorflow.python.ops import nn_ops
+from tensorflow.contrib import layers as layers_lib
+from tensorflow.contrib.slim.python.slim.nets import resnet_utils
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -53,7 +59,7 @@ NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = data_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
 # Constants describing the training process.
 MOVING_AVERAGE_DECAY = 0.9995  # The decay to use for the moving average.
-NUM_EPOCHS_PER_DECAY = 72.0  # Epochs after which learning rate decays.
+NUM_EPOCHS_PER_DECAY = 100.0  # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.01  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.05  # Initial learning rate.
 DROPOUT_RATE = 0.5  # Probability for dropout layers.
@@ -135,7 +141,7 @@ def distorted_inputs():
 	return images, labels
 
 
-def inputs(eval_data):
+def inputs(eval_data, sessid):
 	"""Construct input for BBBC006 evaluation using the Reader ops.
 	Args:
 		eval_data: bool, indicating if one should use the train or eval data set.
@@ -148,13 +154,13 @@ def inputs(eval_data):
 	"""
 	if not FLAGS.data_dir:
 		raise ValueError('Please supply a data_dir')
-	images, labels, i_paths, s_paths, i_path, s_path, csv_content = data_input.inputs(eval_data=eval_data,
-										  batch_size=FLAGS.batch_size)
+	images, labels, i_paths = data_input.inputs(eval_data=eval_data,
+										  batch_size=FLAGS.batch_size, sessid = sessid)
 	labels = tf.cast(tf.divide(labels,255),tf.int32)
 	if FLAGS.use_fp16:
 		images = tf.cast(images, tf.float16)
 		labels = tf.cast(labels, tf.float16)
-	return images, labels, i_paths, s_paths, i_path, s_path, csv_content
+	return images, labels, i_paths
 
 
 def get_deconv_filter(shape):
@@ -271,6 +277,72 @@ def inference(images, train=True):
 
 	return s_fuse
 
+"""
+	Copied from tf website, just tweaked a bit to include BN and ReLU
+"""
+def bottleneck(inputs,
+               depth,
+               depth_bottleneck,
+               stride,
+               rate=1,
+               outputs_collections=None,
+               scope=None):
+  """Bottleneck residual unit variant with BN before convolutions.
+  This is the full preactivation residual unit variant proposed in [2]. See
+  Fig. 1(b) of [2] for its definition. Note that we use here the bottleneck
+  variant which has an extra bottleneck layer.
+  When putting together two consecutive ResNet blocks that use this unit, one
+  should use stride = 2 in the last unit of the first block.
+  Args:
+    inputs: A tensor of size [batch, height, width, channels].
+    depth: The depth of the ResNet unit output.
+    depth_bottleneck: The depth of the bottleneck layers.
+    stride: The ResNet unit's stride. Determines the amount of downsampling of
+      the units output compared to its input.
+    rate: An integer, rate for atrous convolution.
+    outputs_collections: Collection to add the ResNet unit output.
+    scope: Optional variable_scope.
+  Returns:
+    The ResNet unit's output.
+  """
+  with variable_scope.variable_scope(scope, 'bottleneck_v2', [inputs]) as sc:
+    depth_in = utils.last_dimension(inputs.get_shape(), min_rank=4)
+    preact = layers.batch_norm(
+        inputs, activation_fn=nn_ops.relu, scope='preact')
+    if depth == depth_in:
+      shortcut = resnet_utils.subsample(inputs, stride, 'shortcut')
+    else:
+      shortcut = layers_lib.conv2d(
+          preact,
+          depth, [1, 1],
+          stride=stride,
+          normalizer_fn=None,
+          activation_fn=None,
+          scope='shortcut')
+
+    residual = preact
+    residual = tf.layers.batch_normalization(residual)
+    residual = tf.nn.relu(residual)
+    residual = layers_lib.conv2d(
+        residual, depth_bottleneck, [1, 1], stride=1, scope='conv1')
+    residual = tf.layers.batch_normalization(residual)
+    residual = tf.nn.relu(residual)
+    residual = resnet_utils.conv2d_same(
+        residual, depth_bottleneck, 3, stride, rate=rate, scope='conv2')
+    residual = tf.layers.batch_normalization(residual)
+    residual = tf.nn.relu(residual)
+    residual = layers_lib.conv2d(
+        residual,
+        depth, [1, 1],
+        stride=1,
+        normalizer_fn=None,
+        activation_fn=None,
+        scope='conv3')
+
+    output = shortcut + residual
+
+    return utils.collect_named_outputs(outputs_collections, sc.name, output)
+
 def inference_bottleneck(images, train=True):
 	in_layer = images
 	feat_out = FLAGS.feat_root
@@ -278,29 +350,25 @@ def inference_bottleneck(images, train=True):
 	
 	with tf.variable_scope('bottleneck0-1') as scope:
 		in_layer = tf.layers.max_pooling2d(in_layer, 2, 2, padding='same')
-		in_layer = tf.layers.conv2d(in_layer, feat_out, (3, 3), padding='same',activation=tf.nn.relu, name=scope.name)
 		in_layer = tf.layers.batch_normalization(in_layer)
 		in_layer = tf.nn.relu(in_layer)
+		in_layer = tf.layers.conv2d(in_layer, feat_out, (3, 3), padding='same', name=scope.name)
 	with tf.variable_scope('bottleneck0-2') as scope:
-		in_layer = tf.layers.conv2d(in_layer, feat_out, (3, 3), padding='same',activation=tf.nn.relu, name=scope.name)
 		in_layer = tf.layers.batch_normalization(in_layer)
 		in_layer = tf.nn.relu(in_layer)
+		in_layer = tf.layers.conv2d(in_layer, feat_out, (3, 3), padding='same', name=scope.name)
 		s_outputs.append(in_layer)
 	for layer in range(5):
 		with tf.variable_scope('bottleneck{0}-{1}'.format(layer + 1,1)) as scope:
 			in_layer = tf.layers.max_pooling2d(in_layer, 2, 2, padding='same')
-			in_layer = bottleneck(in_layer,min(feat_out*2,256),feat_out,1,scope=scope)
-			in_layer = tf.layers.batch_normalization(in_layer)
-			in_layer = tf.nn.relu(in_layer)
+			in_layer = bottleneck(in_layer,min(feat_out*2,256),feat_out,1)
 		with tf.variable_scope('bottleneck{0}-{1}'.format(layer + 1,2)) as scope:
 			feat_out = min(feat_out*2,256)
-			in_layer = bottleneck(in_layer,feat_out,feat_out,1,scope=scope)
-			in_layer = tf.layers.batch_normalization(in_layer)
-			in_layer = tf.nn.relu(in_layer)
+			in_layer = bottleneck(in_layer,feat_out,feat_out,1)
 			s_outputs.append(in_layer)
 	# populate s_outputs
-
-	dc = 2 # may need to change this TODO
+	encoding = in_layer
+	dc = 2 
 	ds = [FLAGS.batch_size, IMAGE_HEIGHT, IMAGE_WIDTH, FLAGS.num_classes]
 	for layer in range(len(s_outputs)):
 		with tf.variable_scope('deconv{0}'.format(layer + 1)) as scope:
@@ -316,15 +384,14 @@ def inference_bottleneck(images, train=True):
 
 	s_fuse = tf.concat(s_outputs,axis=-1)
 	with tf.variable_scope('after_fusion-1') as scope:
-		s_fuse = tf.layers.conv2d(s_fuse, 2, (3, 3), padding='same',
-										activation=tf.nn.relu, name=scope.name)
 		s_fuse = tf.layers.batch_normalization(s_fuse)
-	with tf.variable_scope('after_fusion-2') as scope:
 		s_fuse = tf.nn.relu(s_fuse)
-
-		s_fuse = tf.layers.conv2d(s_fuse, 2, (1, 1), padding='same',
-										activation=tf.nn.relu, name=scope.name)
-	return s_fuse
+		s_fuse = tf.layers.conv2d(s_fuse, 2, (3, 3), padding='same', name=scope.name)
+	with tf.variable_scope('after_fusion-2') as scope:
+		s_fuse = tf.layers.batch_normalization(s_fuse)
+		s_fuse = tf.nn.relu(s_fuse)
+		s_fuse = tf.layers.conv2d(s_fuse, 2, (1, 1), padding='same', name=scope.name)
+	return s_fuse, encoding
 
 def _add_loss_summaries(total_loss):
 	"""Add summaries for losses in BBBC006 model.

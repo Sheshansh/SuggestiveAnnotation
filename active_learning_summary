@@ -1,0 +1,10 @@
+K = 10, k = 10
+started with images : train_1 to train_10 in train set
+
+First iteration:
+
+10 images
+on train : 0.977, 0.969, 0.973, 0.977
+on train_eval : 0.725, 0.704, 0.753, 0.698
+['reshaped_warwick/images_train_eval/train_33.png', 'reshaped_warwick/images_train_eval/train_67.png', 'reshaped_warwick/images_train_eval/train_15.png', 'reshaped_warwick/images_train_eval/train_85.png', 'reshaped_warwick/images_train_eval/train_39.png', 'reshaped_warwick/images_train_eval/train_47.png', 'reshaped_warwick/images_train_eval/train_64.png', 'reshaped_warwick/images_train_eval/train_26.png', 'reshaped_warwick/images_train_eval/train_52.png', 'reshaped_warwick/images_train_eval/train_54.png']
+
