@@ -24,3 +24,17 @@ on train : 0.970, 0.954, 0.969, 0.957
 on train_eval : 0.807, 0.802, 0.809, 0.786
 on test : 0.761, 0.754, 0.750, 0.736
 ['reshaped_warwick/images_train_eval/train_25.png', 'reshaped_warwick/images_train_eval/train_20.png', 'reshaped_warwick/images_train_eval/train_63.png', 'reshaped_warwick/images_train_eval/train_65.png', 'reshaped_warwick/images_train_eval/train_55.png', 'reshaped_warwick/images_train_eval/train_14.png', 'reshaped_warwick/images_train_eval/train_77.png', 'reshaped_warwick/images_train_eval/train_41.png', 'reshaped_warwick/images_train_eval/train_72.png', 'reshaped_warwick/images_train_eval/train_76.png']
+
+Fourth iteration detailed summary : 
+over train_eval :  400 : 0.706, 0.696, 0.690, 0.690
+over train_eval :  800 : 0.781, 0.774, 0.754, 0.753
+over train_eval : 1200 : 0.799, 0.803, 0.780, 0.783
+over train_eval : 1600 : 0.805, 0.819, 0.792, 0.804
+over train_eval : 2000 : 0.810, 0.826, 0.802, 0.814
+over train_eval : 2400 : 0.815, 0.835, 0.805, 0.818
+over train_eval : 2800 : 0.815, 0.837, 0.811, 0.822
+over train_eval : 3200 : 0.817, 0.772, 0.813, 0.825
+over train_eval : 3600 : 0.818, 0.795, 0.816, 0.828
+over train_eval : 4000 : 0.821, 0.809, 0.816, 0.831
+on train :				 0.967, 0.850, 0.967, 0.960
+on test :				 0.755, 0.719, 0.736, 0.746
