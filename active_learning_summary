@@ -16,3 +16,11 @@ on train : 0.969, 0.957, 0.965, 0.966
 on train_eval : 0.789, 0.766, 0.791, 0.768
 on test : 0.743, 0.718, 0.732, 0.714
 ['reshaped_warwick/images_train_eval/train_19.png', 'reshaped_warwick/images_train_eval/train_17.png', 'reshaped_warwick/images_train_eval/train_75.png', 'reshaped_warwick/images_train_eval/train_45.png', 'reshaped_warwick/images_train_eval/train_56.png', 'reshaped_warwick/images_train_eval/train_27.png', 'reshaped_warwick/images_train_eval/train_24.png', 'reshaped_warwick/images_train_eval/train_18.png', 'reshaped_warwick/images_train_eval/train_84.png', 'reshaped_warwick/images_train_eval/train_48.png']
+
+Third iteration:
+
+30 images
+on train : 0.970, 0.954, 0.969, 0.957
+on train_eval : 0.807, 0.802, 0.809, 0.786
+on test : 0.761, 0.754, 0.750, 0.736
+['reshaped_warwick/images_train_eval/train_25.png', 'reshaped_warwick/images_train_eval/train_20.png', 'reshaped_warwick/images_train_eval/train_63.png', 'reshaped_warwick/images_train_eval/train_65.png', 'reshaped_warwick/images_train_eval/train_55.png', 'reshaped_warwick/images_train_eval/train_14.png', 'reshaped_warwick/images_train_eval/train_77.png', 'reshaped_warwick/images_train_eval/train_41.png', 'reshaped_warwick/images_train_eval/train_72.png', 'reshaped_warwick/images_train_eval/train_76.png']
