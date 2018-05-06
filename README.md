@@ -1,6 +1,6 @@
 Suggestive Annotation:
 
-1. Download the gland segmentation challenge dataset and extract it into folder Warwick QU Dataset (Released 2016_07_08).
+1. Download the gland segmentation challenge dataset and extract it into folder "Warwick QU Dataset (Released 2016_07_08)".
 2. To change all images to same dimensions run,
 	$python reshape.py
    It generates the new images in reshaped_warwick directory.
