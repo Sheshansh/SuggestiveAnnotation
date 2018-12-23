@@ -1,4 +1,6 @@
-Suggestive Annotation:
+## Suggestive Annotation
+
+### Instructions to Run:
 
 1. Download the gland segmentation challenge dataset and extract it into folder `Warwick QU Dataset (Released 2016_07_08)`.
 2. To change all images to same dimensions run `reshape.py`.
